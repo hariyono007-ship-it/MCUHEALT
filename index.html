@@ -127,6 +127,21 @@ footer span{color:var(--a1)}
 .spinner{width:48px;height:48px;border:3px solid var(--border);border-top-color:var(--a1);border-radius:50%;animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 .ov-txt{font-family:'Orbitron',sans-serif;font-size:13px;color:var(--a1);letter-spacing:2px}
+
+/* ─── MODAL GITHUB SETTING ─── */
+.gh-modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;align-items:center;justify-content:center}
+.gh-modal-overlay.open{display:flex}
+.gh-modal{background:var(--bg2,#1a1a2e);border:1px solid var(--a1,#00d4ff);border-radius:14px;padding:28px 32px;width:min(480px,92vw);color:#e0e0e0;font-family:'Roboto',sans-serif}
+.gh-modal h3{margin:0 0 6px;font-family:'Orbitron',sans-serif;font-size:14px;color:var(--a1,#00d4ff);letter-spacing:2px}
+.gh-modal p{margin:0 0 18px;font-size:12px;color:#888;line-height:1.5}
+.gh-modal label{display:block;font-size:11px;color:#aaa;margin-bottom:4px;letter-spacing:1px}
+.gh-modal input{width:100%;box-sizing:border-box;background:#0d0d1a;border:1px solid #333;border-radius:7px;padding:9px 12px;color:#e0e0e0;font-size:13px;margin-bottom:14px;outline:none}
+.gh-modal input:focus{border-color:var(--a1,#00d4ff)}
+.gh-modal .gh-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:6px}
+.gh-modal .gh-btn{padding:8px 18px;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;letter-spacing:1px}
+.gh-btn-cancel{background:#2a2a3a;color:#888}
+.gh-btn-save{background:linear-gradient(135deg,var(--a1,#00d4ff),var(--a2,#00ff88));color:#000}
+.gh-status{font-size:11px;margin-top:10px;min-height:16px;text-align:center}
 </style>
 </head>
 <body>
@@ -169,8 +184,11 @@ footer span{color:var(--a1)}
         UPLOAD EXCEL BARU
       </button>
       <button class="btn-download" id="btn-dl" onclick="downloadUpdatedHTML()" disabled>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="8 17 12 21 16 17"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"/></svg>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
         SIMPAN
+      </button>
+      <button class="btn-download" onclick="openGhModal()" title="Konfigurasi GitHub" style="background:linear-gradient(135deg,#6e40c9,#a259ff);min-width:unset;padding:0 12px">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07M8.46 8.46a5 5 0 0 0 0 7.07"/></svg>
       </button>
     </div>
     <div class="last-update" id="last-update">Belum ada data · Upload file Excel MCU</div>
@@ -540,30 +558,91 @@ function handleUpload(e) {
   reader.readAsArrayBuffer(file);
 }
 
-// ─── SIMPAN DATA ke localStorage ───
-function downloadUpdatedHTML() {
+// ─── GITHUB CONFIG (repo sudah fix, hanya perlu token) ───
+const GH_OWNER    = 'hariyono007-ship-it';
+const GH_REPO     = 'MCUHEALT';
+const GH_FILEPATH = 'index.html';
+
+function openGhModal(){
+  document.getElementById('gh-token').value = localStorage.getItem('gh_token') || '';
+  document.getElementById('gh-status').textContent = '';
+  document.getElementById('gh-modal').classList.add('open');
+}
+function closeGhModal(){ document.getElementById('gh-modal').classList.remove('open'); }
+function saveGhConfig(){
+  const token = document.getElementById('gh-token').value.trim();
+  if(!token){ document.getElementById('gh-status').style.color='#ff4444'; document.getElementById('gh-status').textContent='Token wajib diisi.'; return; }
+  localStorage.setItem('gh_token', token);
+  document.getElementById('gh-status').style.color='#00ff88';
+  document.getElementById('gh-status').textContent='✔ Token tersimpan!';
+  setTimeout(closeGhModal, 1200);
+}
+
+// ─── SIMPAN DATA & PUSH KE GITHUB ───
+async function downloadUpdatedHTML() {
   const payload = JSON.parse(document.getElementById('embedded-data').textContent);
   if(!payload.employees.length){ showAlert('err','Belum ada data untuk disimpan.'); return; }
 
-  payload.savedAt = new Date().toLocaleString('id-ID');
-
-  try {
-    localStorage.setItem('mcu_jpc_data', JSON.stringify(payload));
-  } catch(e) {
-    showAlert('err','Gagal menyimpan: kapasitas penyimpanan penuh atau browser tidak mendukung.');
+  const token = localStorage.getItem('gh_token') || '';
+  if(!token){
+    showAlert('err','Token GitHub belum diisi. Klik tombol ⚙ untuk memasukkan token.');
     return;
   }
 
-  // Update tampilan tombol sebagai konfirmasi tersimpan
+  const owner    = GH_OWNER;
+  const repo     = GH_REPO;
+  const filePath = GH_FILEPATH;
+
+  payload.savedAt = new Date().toLocaleString('id-ID');
+
+  // Tombol loading
   const btn = document.getElementById('btn-dl');
-  btn.style.background = 'linear-gradient(135deg,#00ff88,#007744)';
-  btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> TERSIMPAN`;
-  setTimeout(()=>{
+  btn.disabled = true;
+  btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="animation:spin .8s linear infinite"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg> MENYIMPAN...`;
+
+  try {
+    // Ambil HTML saat ini & embed data terbaru
+    const html    = document.documentElement.outerHTML;
+    const updated = html.replace(
+      /<script id="embedded-data"[^>]*>[\s\S]*?<\/script>/,
+      `<script id="embedded-data" type="application/json">\n${JSON.stringify(payload)}\n<\/script>`
+    );
+    const encoded = btoa(unescape(encodeURIComponent(updated)));
+
+    // Ambil SHA file saat ini di GitHub (diperlukan untuk update)
+    const apiBase = `https://api.github.com/repos/${owner}/${repo}/contents/${filePath}`;
+    const headers = { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' };
+
+    let sha = null;
+    const getRes = await fetch(apiBase, { headers });
+    if(getRes.ok){ const j = await getRes.json(); sha = j.sha; }
+
+    // Push ke GitHub
+    const body = { message: `Update data MCU · ${payload.savedAt}`, content: encoded };
+    if(sha) body.sha = sha;
+
+    const putRes = await fetch(apiBase, { method:'PUT', headers, body: JSON.stringify(body) });
+    if(!putRes.ok){
+      const err = await putRes.json();
+      throw new Error(err.message || putRes.statusText);
+    }
+
+    // Sukses
+    btn.style.background = 'linear-gradient(135deg,#00ff88,#007744)';
+    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> TERSIMPAN`;
+    btn.disabled = false;
+    setTimeout(()=>{
+      btn.style.background = '';
+      btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> SIMPAN`;
+    }, 3000);
+    showAlert('ok', `✅ Data ${payload.employees.length} karyawan berhasil dipush ke GitHub · ${payload.savedAt}`);
+
+  } catch(e) {
+    btn.disabled = false;
     btn.style.background = '';
     btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> SIMPAN`;
-  }, 3000);
-
-  showAlert('ok', `Data ${payload.employees.length} karyawan berhasil disimpan · ${payload.savedAt}`);
+    showAlert('err', `Gagal push ke GitHub: ${e.message}`);
+  }
 }
 
 // ─── LOAD DATA: cek localStorage dulu, fallback ke embedded ───
@@ -598,6 +677,22 @@ function downloadUpdatedHTML() {
   }
 })();
 </script>
+
+
+<!-- MODAL GITHUB SETTING -->
+<div class="gh-modal-overlay" id="gh-modal">
+  <div class="gh-modal">
+    <h3>⚙ GITHUB TOKEN</h3>
+    <p>Masukkan Personal Access Token (PAT) GitHub Anda sekali saja. Token tersimpan di browser ini dan digunakan untuk push data ke GitHub Pages.</p>
+    <label>PERSONAL ACCESS TOKEN (PAT)</label>
+    <input id="gh-token" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" />
+    <div class="gh-status" id="gh-status"></div>
+    <div class="gh-actions">
+      <button class="gh-btn gh-btn-cancel" onclick="closeGhModal()">Batal</button>
+      <button class="gh-btn gh-btn-save" onclick="saveGhConfig()">Simpan Token</button>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>
