@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MCU Dashboard – PT Jakarta Prima Cranes</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#030a14;--surface:#071525;--card:#0a1e35;--border:#0d3b6e;
+  --a1:#00d4ff;--a2:#00ff88;--a3:#ff6b35;--a4:#ffd700;--a5:#ff3e7f;--a6:#b44fff;
+  --text:#e0f4ff;--muted:#5a8ba8;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:'Rajdhani',sans-serif;min-height:100vh;overflow-x:hidden}
+
+/* TICKER */
+.ticker-wrap{background:linear-gradient(90deg,#00d4ff18,#00ff8818,#ff6b3518,#00d4ff18);border-top:1px solid var(--a1);border-bottom:1px solid var(--a2);padding:9px 0;overflow:hidden;white-space:nowrap}
+.ticker-txt{display:inline-block;animation:tick 45s linear infinite;font-family:'Orbitron',sans-serif;font-size:12px;font-weight:700;letter-spacing:2px;background:linear-gradient(90deg,var(--a1),var(--a2),var(--a4),var(--a5),var(--a1));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+@keyframes tick{0%{transform:translateX(100vw)}100%{transform:translateX(-100%)}}
+
+/* HEADER */
+header{background:linear-gradient(135deg,#030a14 0%,#071a30 50%,#030a14 100%);border-bottom:2px solid var(--border);padding:14px 28px;display:flex;align-items:center;justify-content:space-between;position:relative}
+header::after{content:'';position:absolute;bottom:-2px;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--a1),var(--a2),transparent)}
+.logo-area{display:flex;align-items:center;gap:14px}
+.logo-box{width:68px;height:68px;background:linear-gradient(135deg,#0d2a4e,#1a4a80);border:2px solid var(--a1);border-radius:12px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 20px rgba(0,212,255,.3),inset 0 0 20px rgba(0,212,255,.08);flex-shrink:0}
+.title-area h1{font-family:'Orbitron',sans-serif;font-size:19px;font-weight:900;color:var(--a1);text-shadow:0 0 20px rgba(0,212,255,.5);letter-spacing:2px}
+.title-area h2{font-size:13px;color:var(--a2);font-weight:600;letter-spacing:3px;text-transform:uppercase}
+.title-area p{font-size:11px;color:var(--muted);margin-top:2px;letter-spacing:1px}
+
+/* UPLOAD PANEL */
+.upload-panel{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+.btn-upload{background:linear-gradient(135deg,var(--a1),#007fa8);color:#000;border:none;padding:10px 18px;border-radius:8px;font-family:'Orbitron',sans-serif;font-size:11px;font-weight:700;cursor:pointer;letter-spacing:1px;display:flex;align-items:center;gap:7px;transition:all .3s;box-shadow:0 0 15px rgba(0,212,255,.35)}
+.btn-upload:hover{box-shadow:0 0 28px rgba(0,212,255,.65);transform:translateY(-2px)}
+.btn-download{background:linear-gradient(135deg,var(--a2),#008844);color:#000;border:none;padding:10px 18px;border-radius:8px;font-family:'Orbitron',sans-serif;font-size:11px;font-weight:700;cursor:pointer;letter-spacing:1px;display:flex;align-items:center;gap:7px;transition:all .3s;box-shadow:0 0 15px rgba(0,255,136,.35)}
+.btn-download:hover{box-shadow:0 0 28px rgba(0,255,136,.65);transform:translateY(-2px)}
+.btn-download:disabled{opacity:.35;cursor:not-allowed;transform:none}
+.btn-row{display:flex;gap:10px}
+.last-update{font-size:11px;color:var(--muted);text-align:right;letter-spacing:.5px}
+#file-input{display:none}
+
+/* MAIN */
+main{padding:20px 28px}
+
+/* EMPTY STATE */
+.empty{text-align:center;padding:90px 20px;color:var(--muted)}
+.empty-icon{font-size:56px;margin-bottom:18px;opacity:.6}
+.empty h3{font-family:'Orbitron',sans-serif;font-size:15px;color:var(--a1);margin-bottom:10px;letter-spacing:2px}
+.empty p{font-size:14px;line-height:1.8;max-width:500px;margin:0 auto}
+.empty .steps{margin-top:24px;display:flex;justify-content:center;gap:20px;flex-wrap:wrap}
+.empty .step{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 18px;font-size:13px;min-width:160px}
+.empty .step b{display:block;font-family:'Orbitron',sans-serif;font-size:11px;color:var(--a2);margin-bottom:4px;letter-spacing:1px}
+
+/* ALERT */
+.alert{padding:12px 20px;border-radius:10px;font-size:13px;font-weight:600;letter-spacing:.5px;margin-bottom:18px;display:none;align-items:center;gap:10px}
+.alert-ok{background:rgba(0,255,136,.12);border:1px solid var(--a2);color:var(--a2)}
+.alert-err{background:rgba(255,62,127,.12);border:1px solid var(--a5);color:var(--a5)}
+
+/* KPI */
+.kpi-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:20px}
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:15px;text-align:center;position:relative;overflow:hidden;transition:transform .25s}
+.kpi:hover{transform:translateY(-3px)}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.kpi:nth-child(1)::before{background:var(--a1);box-shadow:0 0 10px var(--a1)}
+.kpi:nth-child(2)::before{background:var(--a5);box-shadow:0 0 10px var(--a5)}
+.kpi:nth-child(3)::before{background:var(--a4);box-shadow:0 0 10px var(--a4)}
+.kpi:nth-child(4)::before{background:var(--a3);box-shadow:0 0 10px var(--a3)}
+.kpi:nth-child(5)::before{background:var(--a6);box-shadow:0 0 10px var(--a6)}
+.kpi:nth-child(6)::before{background:var(--a2);box-shadow:0 0 10px var(--a2)}
+.kv{font-family:'Orbitron',sans-serif;font-size:28px;font-weight:900;line-height:1;margin-bottom:5px}
+.kpi:nth-child(1) .kv{color:var(--a1);text-shadow:0 0 12px var(--a1)}
+.kpi:nth-child(2) .kv{color:var(--a5);text-shadow:0 0 12px var(--a5)}
+.kpi:nth-child(3) .kv{color:var(--a4);text-shadow:0 0 12px var(--a4)}
+.kpi:nth-child(4) .kv{color:var(--a3);text-shadow:0 0 12px var(--a3)}
+.kpi:nth-child(5) .kv{color:var(--a6);text-shadow:0 0 12px var(--a6)}
+.kpi:nth-child(6) .kv{color:var(--a2);text-shadow:0 0 12px var(--a2)}
+.kl{font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;font-weight:600}
+
+/* WORK GRID */
+.work-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.wc{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center}
+.wv{font-family:'Orbitron',sans-serif;font-size:22px;font-weight:900;color:var(--a4);text-shadow:0 0 10px var(--a4)}
+.wu{font-size:10px;color:var(--muted);letter-spacing:1px;margin-top:2px}
+.wl{font-size:12px;color:var(--text);margin-top:4px;font-weight:600}
+
+/* CHARTS */
+.cr3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px}
+.cr2{display:grid;grid-template-columns:1.4fr 1fr;gap:16px;margin-bottom:16px}
+.cc{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px;position:relative;overflow:hidden}
+.cc::before{content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;background:radial-gradient(circle at 50% 0%,rgba(0,212,255,.04),transparent 60%);pointer-events:none}
+.ct{font-family:'Orbitron',sans-serif;font-size:11px;font-weight:700;color:var(--a1);letter-spacing:2px;text-transform:uppercase;margin-bottom:2px;display:flex;align-items:center;gap:7px}
+.dot{width:7px;height:7px;border-radius:50%;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+.cs{font-size:11px;color:var(--muted);margin-bottom:10px}
+canvas{max-height:200px}
+
+/* TABLE */
+.tc{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:16px}
+.th2{padding:12px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:linear-gradient(90deg,#071a30,#0a1e35)}
+.tctrl{display:flex;gap:9px;align-items:center}
+select.mf,input.sb{background:#071a30;border:1px solid var(--border);color:var(--a1);padding:6px 11px;border-radius:6px;font-family:'Rajdhani',sans-serif;font-size:13px;outline:none}
+input.sb{color:var(--text);width:190px}
+input.sb::placeholder{color:var(--muted)}
+.tw{overflow-x:auto;max-height:360px;overflow-y:auto}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+thead{position:sticky;top:0;z-index:10}
+th{background:#0d2a4e;color:var(--a1);font-family:'Orbitron',sans-serif;font-size:9.5px;letter-spacing:1px;padding:9px 11px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:8px 11px;border-bottom:1px solid #0a1e35;white-space:nowrap;color:#a8c8e0}
+tr:hover td{background:rgba(13,42,78,.4);color:var(--text)}
+.by{padding:2px 7px;border-radius:20px;font-size:9px;font-weight:700;letter-spacing:.5px;font-family:'Orbitron',sans-serif}
+.ya{background:rgba(255,62,127,.15);color:var(--a5);border:1px solid var(--a5)}
+.tdk{background:rgba(0,255,136,.1);color:var(--a2);border:1px solid var(--a2)}
+.risk{background:rgba(255,107,53,.15);color:var(--a3);border:1px solid var(--a3)}
+.nil{background:rgba(0,212,255,.08);color:var(--a1);border:1px solid var(--border)}
+
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+footer{text-align:center;padding:14px;border-top:1px solid var(--border);color:var(--muted);font-size:11px;letter-spacing:1px}
+footer span{color:var(--a1)}
+
+/* LOADING OVERLAY */
+.overlay{position:fixed;inset:0;background:rgba(3,10,20,.85);display:none;align-items:center;justify-content:center;z-index:999;flex-direction:column;gap:16px}
+.spinner{width:48px;height:48px;border:3px solid var(--border);border-top-color:var(--a1);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ov-txt{font-family:'Orbitron',sans-serif;font-size:13px;color:var(--a1);letter-spacing:2px}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div class="overlay" id="overlay">
+  <div class="spinner"></div>
+  <div class="ov-txt">MEMPROSES DATA...</div>
+</div>
+
+<!-- TICKER -->
+<div class="ticker-wrap">
+  <span class="ticker-txt">⚕&nbsp;&nbsp;BANYAK ORANG RELA MENGORBANKAN KESEHATAN DEMI UANG , DAN BANYAK ORANG YG RELA KEHILANGAN UANG DEMI KESEHATAN&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;⚕&nbsp;&nbsp;BANYAK ORANG RELA MENGORBANKAN KESEHATAN DEMI UANG , DAN BANYAK ORANG YG RELA KEHILANGAN UANG DEMI KESEHATAN&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;⚕&nbsp;&nbsp;BANYAK ORANG RELA MENGORBANKAN KESEHATAN DEMI UANG , DAN BANYAK ORANG YG RELA KEHILANGAN UANG DEMI KESEHATAN</span>
+</div>
+
+<!-- HEADER -->
+<header>
+  <div class="logo-area">
+    <div class="logo-box">
+      <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" width="52" height="52">
+        <defs><linearGradient id="lg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#00d4ff"/><stop offset="100%" stop-color="#00ff88"/></linearGradient></defs>
+        <rect x="46" y="13" width="8" height="62" fill="url(#lg)" rx="2"/>
+        <rect x="18" y="13" width="64" height="7" fill="url(#lg)" rx="2"/>
+        <line x1="28" y1="20" x2="28" y2="54" stroke="#ffd700" stroke-width="2.5"/>
+        <circle cx="28" cy="57" r="4.5" fill="#ffd700"/>
+        <rect x="34" y="75" width="32" height="8" fill="url(#lg)" rx="2"/>
+        <text x="50" y="97" text-anchor="middle" font-family="Orbitron,sans-serif" font-size="12" font-weight="900" fill="#00d4ff" letter-spacing="2">JPC</text>
+      </svg>
+    </div>
+    <div class="title-area">
+      <h1>MCU HEALTH DASHBOARD</h1>
+      <h2>PT Jakarta Prima Cranes</h2>
+      <p>Medical Check-Up · Daftar Faktor Risiko Kesehatan Karyawan</p>
+    </div>
+  </div>
+  <div class="upload-panel">
+    <div class="btn-row">
+      <button class="btn-upload" onclick="document.getElementById('file-input').click()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
+        UPLOAD EXCEL BARU
+      </button>
+      <button class="btn-download" id="btn-dl" onclick="downloadUpdatedHTML()" disabled>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="8 17 12 21 16 17"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"/></svg>
+        SIMPAN
+      </button>
+    </div>
+    <div class="last-update" id="last-update">Belum ada data · Upload file Excel MCU</div>
+    <input type="file" id="file-input" accept=".xlsx,.xls" onchange="handleUpload(event)">
+  </div>
+</header>
+
+<main>
+  <div class="alert alert-ok" id="alert-ok">✅ <span id="alert-ok-txt"></span></div>
+  <div class="alert alert-err" id="alert-err">⚠️ <span id="alert-err-txt"></span></div>
+
+  <!-- EMPTY STATE -->
+  <div class="empty" id="empty-state">
+    <div class="empty-icon">🏥</div>
+    <h3>DASHBOARD MCU SIAP DIGUNAKAN</h3>
+    <p>Upload file Excel <strong style="color:var(--a1)">New Summary Daftar Verifikasi MCU</strong> untuk menampilkan data terbaru.</p>
+    <div class="steps">
+      <div class="step"><b>LANGKAH 1</b>Klik tombol<br><strong style="color:var(--a1)">UPLOAD EXCEL BARU</strong></div>
+      <div class="step"><b>LANGKAH 2</b>Pilih file .xlsx<br>MCU terbaru</div>
+      <div class="step"><b>LANGKAH 3</b>Klik <strong style="color:var(--a2)">SIMPAN</strong><br>→ file HTML tersimpan di perangkat</div>
+    </div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div id="dashboard" style="display:none">
+
+    <!-- KPI -->
+    <div class="kpi-grid">
+      <div class="kpi"><div class="kv" id="k-total">0</div><div class="kl">Total Karyawan MCU</div></div>
+      <div class="kpi"><div class="kv" id="k-rokok">0</div><div class="kl">Perokok Aktif</div></div>
+      <div class="kpi"><div class="kv" id="k-imt">0</div><div class="kl">IMT &gt; 25 Overweight</div></div>
+      <div class="kpi"><div class="kv" id="k-gula">0</div><div class="kl">Gula Darah &gt; 115</div></div>
+      <div class="kpi"><div class="kv" id="k-chol">0</div><div class="kl">Kolesterol Abnormal</div></div>
+      <div class="kpi"><div class="kv" id="k-r0">0</div><div class="kl">Nihil Faktor Risiko</div></div>
+    </div>
+
+    <!-- WORK STATS -->
+    <div class="work-row" id="work-row"></div>
+
+    <!-- CHARTS R1 -->
+    <div class="cr3">
+      <div class="cc">
+        <div class="ct"><span class="dot" style="background:var(--a5);box-shadow:0 0 7px var(--a5)"></span>Perokok per Bulan</div>
+        <div class="cs">Ya / Tidak Merokok</div>
+        <canvas id="c1"></canvas>
+      </div>
+      <div class="cc">
+        <div class="ct"><span class="dot" style="background:var(--a4);box-shadow:0 0 7px var(--a4)"></span>IMT Overweight</div>
+        <div class="cs">IMT &gt; 25 per Bulan</div>
+        <canvas id="c2"></canvas>
+      </div>
+      <div class="cc">
+        <div class="ct"><span class="dot" style="background:var(--a3);box-shadow:0 0 7px var(--a3)"></span>Gula Darah &gt; 115</div>
+        <div class="cs">Risiko Diabetes per Bulan</div>
+        <canvas id="c3"></canvas>
+      </div>
+    </div>
+
+    <!-- CHARTS R2 -->
+    <div class="cr2">
+      <div class="cc">
+        <div class="ct"><span class="dot" style="background:var(--a4);box-shadow:0 0 7px var(--a4)"></span>Distribusi Faktor Risiko</div>
+        <div class="cs">Jumlah karyawan per jumlah faktor risiko (0–6)</div>
+        <canvas id="c4"></canvas>
+      </div>
+      <div class="cc">
+        <div class="ct"><span class="dot" style="background:var(--a6);box-shadow:0 0 7px var(--a6)"></span>Profil Kesehatan</div>
+        <div class="cs">% Abnormal tiap parameter</div>
+        <canvas id="c5"></canvas>
+      </div>
+    </div>
+
+    <!-- TABLE -->
+    <div class="tc">
+      <div class="th2">
+        <div class="ct" style="margin:0"><span class="dot" style="background:var(--a1);box-shadow:0 0 7px var(--a1)"></span>Data Karyawan MCU</div>
+        <div class="tctrl">
+          <select class="mf" id="mf" onchange="ft()"><option value="ALL">Semua Bulan</option></select>
+          <input class="sb" id="sb" placeholder="Cari nama / posisi..." oninput="ft()">
+        </div>
+      </div>
+      <div class="tw">
+        <table>
+          <thead><tr>
+            <th>NO</th><th>BULAN</th><th>NAMA</th><th>POSISI</th><th>G</th>
+            <th>ROKOK</th><th>IMT</th><th>IMT&gt;25</th>
+            <th>GULA</th><th>GUL&gt;115</th>
+            <th>T.SYS</th><th>T.DIA</th><th>TD FLAG</th>
+            <th>LDL</th><th>T.CHOL</th><th>LEMAK</th>
+            <th>SGOT</th><th>SGPT</th><th>LIVER</th>
+            <th>FAKTOR RISIKO</th>
+          </tr></thead>
+          <tbody id="tb"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /dashboard -->
+</main>
+
+<footer>&copy; <span>PT Jakarta Prima Cranes</span> · MCU Health Dashboard · <span id="yr">2026</span></footer>
+
+<!-- ===================== EMBEDDED DATA (auto-replaced on upload) ===================== -->
+<script id="embedded-data" type="application/json">
+{"employees":[],"workStats":[],"sourceFile":"","generatedAt":""}
+</script>
+<!-- ================================================================================= -->
+
+<script>
+// ─── CHART INSTANCES ───
+const CHARTS = {};
+
+// ─── CHART OPTIONS FACTORY ───
+function co(yLabel) {
+  return {
+    responsive:true, maintainAspectRatio:true,
+    plugins:{legend:{labels:{color:'#b0cce0',font:{family:'Rajdhani',size:11},boxWidth:12}}},
+    scales:{
+      x:{grid:{color:'#0a2040'},ticks:{color:'#5a8ba8',font:{family:'Rajdhani',size:10}}},
+      y:{grid:{color:'#0a2040'},ticks:{color:'#5a8ba8',font:{family:'Rajdhani',size:10}},
+         title:{display:!!yLabel,text:yLabel||'',color:'#5a8ba8',font:{family:'Rajdhani',size:10}}}
+    }
+  };
+}
+
+// ─── HELPERS ───
+const ya  = v => String(v||'').trim().toLowerCase() === 'ya';
+const fn  = v => (v===null||v===undefined||isNaN(v)) ? '—' : Number(v).toFixed(1);
+const fb  = v => {
+  const x = String(v||'').trim().toLowerCase();
+  if(x==='ya')    return '<span class="by ya">YA</span>';
+  if(x==='tidak') return '<span class="by tdk">TIDAK</span>';
+  return '<span style="color:#5a8ba8">—</span>';
+};
+const fr  = v => (!v||v==='nan'||v.trim()==='')
+  ? '<span class="by nil">NIHIL</span>'
+  : '<span class="by risk">'+v+'</span>';
+const pct = (arr,fn2) => arr.length ? Math.round(arr.filter(fn2).length/arr.length*100) : 0;
+
+function destroyChart(id){ if(CHARTS[id]){CHARTS[id].destroy();delete CHARTS[id];} }
+
+// ─── RENDER DASHBOARD ───
+function renderDashboard(employees, workStats) {
+  if(!employees.length) return;
+  document.getElementById('empty-state').style.display='none';
+  document.getElementById('dashboard').style.display='block';
+
+  // KPIs
+  document.getElementById('k-total').textContent = employees.length;
+  document.getElementById('k-rokok').textContent = employees.filter(e=>ya(e.merokok)).length;
+  document.getElementById('k-imt').textContent   = employees.filter(e=>ya(e.imt_flag)).length;
+  document.getElementById('k-gula').textContent  = employees.filter(e=>ya(e.gula_flag)).length;
+  document.getElementById('k-chol').textContent  = employees.filter(e=>ya(e.lemak_flag)).length;
+  document.getElementById('k-r0').textContent    = employees.filter(e=>!e.faktor||e.faktor==='nan'||e.faktor.trim()==='').length;
+
+  // Work stats
+  const wr = document.getElementById('work-row');
+  if(workStats.length){
+    const tj=workStats.reduce((s,r)=>s+(r.jamKerja||0),0);
+    const tp=workStats.reduce((s,r)=>s+(r.pekerja||0),0);
+    const ts=workStats.reduce((s,r)=>s+(r.sakit||0),0);
+    const th=workStats.reduce((s,r)=>s+(r.hariHilang||0),0);
+    wr.innerHTML=`
+      <div class="wc"><div class="wv">${tj.toLocaleString('id-ID')}</div><div class="wu">JAM</div><div class="wl">Jam Kerja Kumulatif</div></div>
+      <div class="wc"><div class="wv">${tp}</div><div class="wu">ORANG</div><div class="wl">Pekerja Kumulatif</div></div>
+      <div class="wc"><div class="wv">${ts}</div><div class="wu">ORANG</div><div class="wl">Total Pekerja Sakit</div></div>
+      <div class="wc"><div class="wv">${th}</div><div class="wu">HARI</div><div class="wl">Total Hari Hilang</div></div>`;
+    wr.style.display='grid';
+  } else { wr.style.display='none'; }
+
+  // Charts
+  const months = [...new Set(employees.map(e=>e.month))];
+  const byM = (m,fn2) => employees.filter(e=>e.month===m&&fn2(e)).length;
+
+  destroyChart('c1');
+  CHARTS['c1'] = new Chart(document.getElementById('c1'),{type:'bar',data:{
+    labels:months,
+    datasets:[
+      {label:'Ya Merokok', data:months.map(m=>byM(m,e=>ya(e.merokok))),  backgroundColor:'rgba(255,62,127,.7)', borderColor:'#ff3e7f',borderWidth:2,borderRadius:6},
+      {label:'Tidak',      data:months.map(m=>byM(m,e=>!ya(e.merokok))), backgroundColor:'rgba(0,255,136,.45)',borderColor:'#00ff88',borderWidth:2,borderRadius:6}
+    ]
+  },options:co()});
+
+  destroyChart('c2');
+  CHARTS['c2'] = new Chart(document.getElementById('c2'),{type:'bar',data:{
+    labels:months,
+    datasets:[
+      {label:'IMT>25', data:months.map(m=>byM(m,e=>ya(e.imt_flag))),  backgroundColor:'rgba(255,215,0,.7)',  borderColor:'#ffd700',borderWidth:2,borderRadius:6},
+      {label:'Normal', data:months.map(m=>byM(m,e=>!ya(e.imt_flag))), backgroundColor:'rgba(0,212,255,.4)', borderColor:'#00d4ff',borderWidth:2,borderRadius:6}
+    ]
+  },options:co()});
+
+  destroyChart('c3');
+  CHARTS['c3'] = new Chart(document.getElementById('c3'),{type:'line',data:{
+    labels:months,
+    datasets:[
+      {label:'Gula>115',data:months.map(m=>byM(m,e=>ya(e.gula_flag))),borderColor:'#ff6b35',backgroundColor:'rgba(255,107,53,.15)',borderWidth:3,pointBackgroundColor:'#ff6b35',pointRadius:6,tension:.4,fill:true},
+      {label:'Normal',  data:months.map(m=>byM(m,e=>!ya(e.gula_flag))),borderColor:'#00d4ff',backgroundColor:'rgba(0,212,255,.07)',borderWidth:2,pointBackgroundColor:'#00d4ff',pointRadius:4,tension:.4,fill:true}
+    ]
+  },options:co()});
+
+  const rc={0:0,1:0,2:0,3:0,4:0,5:0,6:0};
+  employees.forEach(e=>{
+    if(!e.faktor||e.faktor==='nan'||e.faktor.trim()===''){rc[0]++;return;}
+    rc[Math.min(e.faktor.split(',').length,6)]++;
+  });
+  destroyChart('c4');
+  CHARTS['c4'] = new Chart(document.getElementById('c4'),{type:'bar',data:{
+    labels:['0 Risiko','1 Risiko','2 Risiko','3 Risiko','4 Risiko','5 Risiko','6+ Risiko'],
+    datasets:[{label:'Karyawan',data:Object.values(rc),
+      backgroundColor:['#00ff8888','#00d4ff88','#ffd70088','#ff6b3588','#ff3e7f88','#b44fff88','#ff005588'],
+      borderColor:    ['#00ff88',  '#00d4ff',  '#ffd700',  '#ff6b35',  '#ff3e7f',  '#b44fff',  '#ff0055'],
+      borderWidth:2,borderRadius:8
+    }]
+  },options:co('Jumlah')});
+
+  destroyChart('c5');
+  CHARTS['c5'] = new Chart(document.getElementById('c5'),{type:'radar',data:{
+    labels:['Perokok','IMT>25','Gula>115','Tek.Darah','Kolesterol','Liver'],
+    datasets:[{label:'% Abnormal',
+      data:[pct(employees,e=>ya(e.merokok)),pct(employees,e=>ya(e.imt_flag)),
+            pct(employees,e=>ya(e.gula_flag)),pct(employees,e=>ya(e.td_flag)),
+            pct(employees,e=>ya(e.lemak_flag)),pct(employees,e=>ya(e.liver_flag))],
+      backgroundColor:'rgba(180,79,255,.2)',borderColor:'#b44fff',borderWidth:2,
+      pointBackgroundColor:'#b44fff',pointRadius:5
+    }]
+  },options:{responsive:true,maintainAspectRatio:true,
+    plugins:{legend:{labels:{color:'#b0cce0',font:{family:'Rajdhani',size:11}}}},
+    scales:{r:{grid:{color:'#0d3b6e'},angleLines:{color:'#0d3b6e'},
+      pointLabels:{color:'#b0cce0',font:{family:'Rajdhani',size:10,weight:'600'}},
+      ticks:{color:'#5a8ba8',backdropColor:'transparent',font:{size:8}},suggestedMax:100}}
+  }});
+
+  // Populate month filter
+  const mf = document.getElementById('mf');
+  mf.innerHTML = '<option value="ALL">Semua Bulan</option>';
+  months.forEach(m=>{const o=document.createElement('option');o.value=m;o.textContent=m;mf.appendChild(o);});
+
+  ft(employees);
+}
+
+// ─── TABLE FILTER ───
+let _employees = [];
+function ft(emp) {
+  if(emp) _employees = emp;
+  const m = document.getElementById('mf').value;
+  const s = document.getElementById('sb').value.toLowerCase();
+  const d = _employees.filter(e=>(m==='ALL'||e.month===m)&&(!s||e.nama.toLowerCase().includes(s)||e.posisi.toLowerCase().includes(s)));
+  document.getElementById('tb').innerHTML = d.length
+    ? d.map((e,i)=>`<tr>
+        <td style="color:var(--muted)">${i+1}</td>
+        <td style="color:var(--a1);font-weight:600">${e.month}</td>
+        <td style="font-weight:600;color:var(--text)">${e.nama}</td>
+        <td>${e.posisi}</td><td>${e.gender}</td>
+        <td>${fb(e.merokok)}</td><td>${fn(e.imt)}</td><td>${fb(e.imt_flag)}</td>
+        <td>${fn(e.gula)}</td><td>${fb(e.gula_flag)}</td>
+        <td>${fn(e.td_sys)}</td><td>${fn(e.td_dia)}</td><td>${fb(e.td_flag)}</td>
+        <td>${fn(e.ldl)}</td><td>${fn(e.t_chol)}</td><td>${fb(e.lemak_flag)}</td>
+        <td>${fn(e.sgot)}</td><td>${fn(e.sgpt)}</td><td>${fb(e.liver_flag)}</td>
+        <td>${fr(e.faktor)}</td>
+      </tr>`).join('')
+    : '<tr><td colspan="20" style="text-align:center;color:var(--muted);padding:24px">Tidak ada data</td></tr>';
+}
+
+// ─── PARSE WORKBOOK ───
+function parseWorkbook(wb) {
+  const MONTH_KW = ['JANUARI','FEBRUARI','MARET','APRIL','MEI','MAY','JUNI','JUNE',
+                    'JULI','AGUSTUS','SEPTEMBER','OKTOBER','NOVEMBER','DESEMBER'];
+  const employees = [], workStats = [];
+
+  wb.SheetNames.forEach(sname=>{
+    const up = sname.toUpperCase().trim();
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[sname],{header:1,defval:null,raw:false});
+
+    if(MONTH_KW.some(k=>up.includes(k))){
+      rows.forEach(row=>{
+        const no = row[0];
+        if(no===null||no===undefined) return;
+        const n = parseFloat(no);
+        if(isNaN(n)||n<=0||n>=500) return;
+        const sv = v => {
+          if(v===null||v===undefined) return null;
+          const f = parseFloat(v);
+          return isNaN(f) ? null : f;
+        };
+        employees.push({
+          month:sname.toUpperCase(), no:Math.round(n),
+          nama:    String(row[4]||'').trim(),
+          gender:  String(row[5]||'').trim(),
+          posisi:  String(row[6]||'').trim(),
+          merokok: String(row[10]||'').trim(),
+          imt:     sv(row[11]),  imt_flag:  String(row[12]||'').trim(),
+          gula:    sv(row[13]),  gula_flag: String(row[14]||'').trim(),
+          td_sys:  sv(row[15]),  td_dia:    sv(row[16]),   td_flag:    String(row[17]||'').trim(),
+          ldl:     sv(row[18]),  t_chol:    sv(row[19]),   lemak_flag: String(row[20]||'').trim(),
+          sgot:    sv(row[21]),  sgpt:      sv(row[22]),   liver_flag: String(row[23]||'').trim(),
+          faktor:  String(row[24]||'').trim(),
+        });
+      });
+    } else if(up.includes('SHEET')||up.includes('KERJA')||up.includes('POLA')) {
+      rows.forEach(row=>{
+        const bulan=row[6], tahun=row[7];
+        if(!bulan||!tahun) return;
+        const y=parseFloat(tahun);
+        if(isNaN(y)||y<2000) return;
+        const iv=v=>{ const f=parseFloat(v); return isNaN(f)?0:Math.round(f); };
+        workStats.push({bulan:String(bulan),tahun:Math.round(y),
+          jamKerja:iv(row[8]),pekerja:iv(row[9]),layak:iv(row[10]),
+          sakit:iv(row[11]),hariHilang:iv(row[12]),cmr:parseFloat(row[15])||0});
+      });
+    }
+  });
+  return {employees, workStats};
+}
+
+// ─── HANDLE UPLOAD ───
+function showAlert(type, msg) {
+  document.getElementById('alert-ok').style.display='none';
+  document.getElementById('alert-err').style.display='none';
+  const el = document.getElementById('alert-'+type);
+  document.getElementById('alert-'+type+'-txt').textContent = msg;
+  el.style.display='flex';
+  setTimeout(()=>{el.style.display='none';}, 6000);
+}
+
+function handleUpload(e) {
+  const file = e.target.files[0];
+  if(!file) return;
+  e.target.value='';
+  document.getElementById('overlay').style.display='flex';
+
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const wb = XLSX.read(new Uint8Array(ev.target.result),{type:'array',cellDates:false});
+      const {employees, workStats} = parseWorkbook(wb);
+
+      if(!employees.length){
+        document.getElementById('overlay').style.display='none';
+        showAlert('err','Tidak ada data karyawan ditemukan. Pastikan format file sesuai template MCU.');
+        return;
+      }
+
+      // Save parsed data to embedded script tag
+      const payload = {
+        employees, workStats,
+        sourceFile: file.name,
+        generatedAt: new Date().toLocaleString('id-ID')
+      };
+      document.getElementById('embedded-data').textContent = JSON.stringify(payload);
+
+      // Update UI
+      const now = new Date().toLocaleString('id-ID');
+      document.getElementById('last-update').textContent =
+        `📁 ${file.name} · ${employees.length} karyawan · ${now}`;
+      document.getElementById('btn-dl').disabled = false;
+
+      renderDashboard(employees, workStats);
+      document.getElementById('overlay').style.display='none';
+      showAlert('ok', `Berhasil memuat ${employees.length} data karyawan dari ${file.name}. Klik SIMPAN untuk menyimpan file HTML ke perangkat Anda.`);
+
+    } catch(err) {
+      document.getElementById('overlay').style.display='none';
+      showAlert('err', 'Gagal membaca file: ' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ─── SIMPAN DATA ke localStorage ───
+function downloadUpdatedHTML() {
+  const payload = JSON.parse(document.getElementById('embedded-data').textContent);
+  if(!payload.employees.length){ showAlert('err','Belum ada data untuk disimpan.'); return; }
+
+  payload.savedAt = new Date().toLocaleString('id-ID');
+
+  try {
+    localStorage.setItem('mcu_jpc_data', JSON.stringify(payload));
+  } catch(e) {
+    showAlert('err','Gagal menyimpan: kapasitas penyimpanan penuh atau browser tidak mendukung.');
+    return;
+  }
+
+  // Update tampilan tombol sebagai konfirmasi tersimpan
+  const btn = document.getElementById('btn-dl');
+  btn.style.background = 'linear-gradient(135deg,#00ff88,#007744)';
+  btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> TERSIMPAN`;
+  setTimeout(()=>{
+    btn.style.background = '';
+    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> SIMPAN`;
+  }, 3000);
+
+  showAlert('ok', `Data ${payload.employees.length} karyawan berhasil disimpan · ${payload.savedAt}`);
+}
+
+// ─── LOAD DATA: cek localStorage dulu, fallback ke embedded ───
+(function loadEmbedded(){
+  document.getElementById('yr').textContent = new Date().getFullYear();
+
+  let payload = null;
+
+  // Coba dari localStorage
+  try {
+    const stored = localStorage.getItem('mcu_jpc_data');
+    if(stored) {
+      const parsed = JSON.parse(stored);
+      if(parsed.employees && parsed.employees.length) payload = parsed;
+    }
+  } catch(e){}
+
+  // Fallback ke embedded-data
+  if(!payload) {
+    try {
+      const parsed = JSON.parse(document.getElementById('embedded-data').textContent);
+      if(parsed.employees && parsed.employees.length) payload = parsed;
+    } catch(e){}
+  }
+
+  if(payload) {
+    const savedLabel = payload.savedAt ? ` · Disimpan: ${payload.savedAt}` : '';
+    document.getElementById('last-update').textContent =
+      `📁 ${payload.sourceFile} · ${payload.employees.length} karyawan · ${payload.generatedAt}${savedLabel}`;
+    document.getElementById('btn-dl').disabled = false;
+    renderDashboard(payload.employees, payload.workStats || []);
+  }
+})();
+</script>
+
+</body>
+</html>
